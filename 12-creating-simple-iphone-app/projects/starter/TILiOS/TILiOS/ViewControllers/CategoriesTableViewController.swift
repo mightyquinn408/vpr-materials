@@ -31,6 +31,9 @@ import UIKit
 class CategoriesTableViewController: UITableViewController {
   // MARK: - Properties
   var categories: [Category] = []
+  let categoriesRequest =
+    ResourceRequest<Category>(resourcePath: "categories")
+
 
   // MARK: - View Life Cycle
   override func viewDidLoad() {
@@ -45,9 +48,27 @@ class CategoriesTableViewController: UITableViewController {
 
   // MARK: - IBActions
   @IBAction func refresh(_ sender: UIRefreshControl?) {
-    DispatchQueue.main.async {
-      sender?.endRefreshing()
+    // 1
+    categoriesRequest.getAll { [weak self] result in
+      // 2
+      DispatchQueue.main.async {
+        sender?.endRefreshing()
+      }
+      switch result {
+      // 3
+      case .failure:
+        let message = "There was an error getting the categories"
+        ErrorPresenter.showError(message: message, on: self)
+      // 4
+      case .success(let categories):
+        DispatchQueue.main.async { [weak self] in
+          guard let self = self else { return }
+          self.categories = categories
+          self.tableView.reloadData()
+        }
+      }
     }
+
   }
 }
 

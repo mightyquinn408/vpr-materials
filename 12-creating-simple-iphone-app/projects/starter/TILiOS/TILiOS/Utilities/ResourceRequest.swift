@@ -47,4 +47,53 @@ struct ResourceRequest<ResourceType>
       dataTask.resume()
   }
 
+  // 1
+  func save<CreateType>(
+    _ saveData: CreateType,
+    completion: @escaping
+      (Result<ResourceType, ResourceRequestError>) -> Void
+  ) where CreateType: Codable {
+    do {
+      // 2
+      var urlRequest = URLRequest(url: resourceURL)
+      // 3
+      urlRequest.httpMethod = "POST"
+      // 4
+      urlRequest.addValue(
+        "application/json",
+        forHTTPHeaderField: "Content-Type")
+      // 5
+      urlRequest.httpBody =
+        try JSONEncoder().encode(saveData)
+      // 6
+      let dataTask = URLSession.shared
+        .dataTask(with: urlRequest) { data, response, _ in
+          // 7
+          guard
+            let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200,
+            let jsonData = data
+            else {
+              completion(.failure(.noData))
+              return
+          }
+
+          do {
+            // 8
+            let resource = try JSONDecoder()
+              .decode(ResourceType.self, from: jsonData)
+            completion(.success(resource))
+          } catch {
+            // 9
+            completion(.failure(.decodingError))
+          }
+        }
+      // 10
+      dataTask.resume()
+    // 11
+    } catch {
+      completion(.failure(.encodingError))
+    }
+  }
+
 }

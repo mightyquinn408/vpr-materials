@@ -31,6 +31,7 @@ import UIKit
 class SelectUserTableViewController: UITableViewController {
   // MARK: - Properties
   var users: [User] = []
+  var selectedUser: User
 
   // MARK: - Initializers
   required init?(coder: NSCoder) {
@@ -38,6 +39,7 @@ class SelectUserTableViewController: UITableViewController {
   }
 
   init?(coder: NSCoder, selectedUser: User) {
+    self.selectedUser = selectedUser
     super.init(coder: coder)
   }
 
@@ -48,10 +50,45 @@ class SelectUserTableViewController: UITableViewController {
   }
 
   func loadData() {
+    // 1
+    let usersRequest =
+      ResourceRequest<User>(resourcePath: "users")
+
+    usersRequest.getAll { [weak self] result in
+      switch result {
+      // 2
+      case .failure:
+        let message = "There was an error getting the users"
+        ErrorPresenter
+          .showError(message: message, on: self) { _ in
+            self?.navigationController?
+              .popViewController(animated: true)
+          }
+        // 3
+      case .success(let users):
+        self?.users = users
+        DispatchQueue.main.async { [weak self] in
+          self?.tableView.reloadData()
+        }
+      }
+    }
+
   }
 
   // MARK: - Navigation
   override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+    // 1
+    if segue.identifier == "UnwindSelectUserSegue" {
+      // 2
+      guard
+        let cell = sender as? UITableViewCell,
+        let indexPath = tableView.indexPath(for: cell)
+        else {
+          return
+      }
+      // 3
+      selectedUser = users[indexPath.row]
+    }
   }
 }
 
@@ -65,6 +102,13 @@ extension SelectUserTableViewController {
     let user = users[indexPath.row]
     let cell = tableView.dequeueReusableCell(withIdentifier: "SelectUserCell", for: indexPath)
     cell.textLabel?.text = user.name
+
+    if user.name == selectedUser.name {
+      cell.accessoryType = .checkmark
+    } else {
+      cell.accessoryType = .none
+    }
+
     return cell
   }
 }

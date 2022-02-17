@@ -42,11 +42,42 @@ class CreateAcronymTableViewController: UITableViewController {
   override func viewDidLoad() {
     super.viewDidLoad()
     acronymShortTextField.becomeFirstResponder()
+    populateUsers()
+  }
+
+  func populateUsers() {
+    // 1
+    let usersRequest =
+      ResourceRequest<User>(resourcePath: "users")
+
+    usersRequest.getAll { [weak self] result in
+      switch result {
+      // 2
+      case .failure:
+        let message = "There was an error getting the users"
+        ErrorPresenter
+          .showError(message: message, on: self) { _ in
+            self?.navigationController?
+              .popViewController(animated: true)
+          }
+      // 3
+      case .success(let users):
+        DispatchQueue.main.async { [weak self] in
+          self?.userLabel.text = users[0].name
+        }
+        self?.selectedUser = users[0]
+      }
+    }
   }
 
   // MARK: - Navigation
   @IBSegueAction func makeSelectUserViewController(_ coder: NSCoder) -> SelectUserTableViewController? {
-    return nil
+    guard let user = selectedUser else {
+      return nil
+    }
+    return SelectUserTableViewController(
+      coder: coder,
+      selectedUser: user)
   }
 
 
@@ -56,9 +87,65 @@ class CreateAcronymTableViewController: UITableViewController {
   }
 
   @IBAction func save(_ sender: UIBarButtonItem) {
-    navigationController?.popViewController(animated: true)
+    // 1
+    guard
+      let shortText = acronymShortTextField.text,
+      !shortText.isEmpty
+      else {
+        ErrorPresenter.showError(
+          message: "You must specify an acronym!",
+          on: self)
+        return
+    }
+    guard
+      let longText = acronymLongTextField.text,
+      !longText.isEmpty
+      else {
+        ErrorPresenter.showError(
+          message: "You must specify a meaning!",
+          on: self)
+        return
+    }
+    guard let userID = selectedUser?.id else {
+      let message = "You must have a user to create an acronym!"
+      ErrorPresenter.showError(message: message, on: self)
+      return
+    }
+
+    // 2
+    let acronym = Acronym(
+      short: shortText,
+      long: longText,
+      userID: userID)
+    let acronymSaveData = acronym.toCreateData()
+    // 3
+    ResourceRequest<Acronym>(resourcePath: "acronyms")
+      .save(acronymSaveData) { [weak self] result in
+        switch result {
+        // 4
+        case .failure:
+          let message = "There was a problem saving the acronym"
+          ErrorPresenter.showError(message: message, on: self)
+        // 5
+        case .success:
+          DispatchQueue.main.async { [weak self] in
+            self?.navigationController?
+              .popViewController(animated: true)
+          }
+        }
+    }
+
   }
 
   @IBAction func updateSelectedUser(_ segue: UIStoryboardSegue) {
+    // 1
+    guard let controller = segue.source
+      as? SelectUserTableViewController
+      else {
+        return
+    }
+    // 2
+    selectedUser = controller.selectedUser
+    userLabel.text = selectedUser?.name
   }
 }
